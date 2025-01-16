@@ -52,10 +52,16 @@ class Stash
                 array_push($proxy, self::buildVmess($user['uuid'], $item));
                 array_push($proxies, $item['name']);
             }
-            // if ($item['type'] === 'vless') {
-            //     array_push($proxy, self::buildVless($user['uuid'], $item));
-            //     array_push($proxies, $item['name']);
-            // }
+            if ($item['type'] === 'vless') {
+                if ($item['flow'] === 'xtls-rprx-vision') {
+                    continue;
+                }
+                if ($item['tls'] === 2) {
+                    continue;
+                }
+                array_push($proxy, self::buildVless($user['uuid'], $item));
+                array_push($proxies, $item['name']);
+            }
             if ($item['type'] === 'hysteria') {
                 array_push($proxy, self::buildHysteria($user['uuid'], $item));
                 array_push($proxies, $item['name']);
@@ -169,55 +175,49 @@ class Stash
         return $array;
     }
 
-    public static function buildVless($uuid, $server)
-    {
+    public static function buildVless($password, $server){
         $array = [];
         $array['name'] = $server['name'];
         $array['type'] = 'vless';
         $array['server'] = $server['host'];
         $array['port'] = $server['port'];
-        $array['uuid'] = $uuid;
-        $array['flow'] = !empty($server['flow']) ? $server['flow']: "";
+        $array['uuid'] = $password;
+        $array['alterId'] = 0;
+        $array['cipher'] = 'auto';
         $array['udp'] = true;
 
-        $fingerprints = ['chrome', 'firefox', 'safari', 'ios', 'edge', 'qq']; //随机客户端指纹
-        $array['client-fingerprint'] = $fingerprints[rand(0,count($fingerprints) - 1)];
+        // XTLS流控算法
+        if($server['flow']) ($array['flow'] = $server['flow']);
 
         if ($server['tls']) {
-            $array['tls'] = true;
             switch($server['tls']){
-                case 1:
+                case 1:  //开启TLS
+                    $array['tls'] = true;
                     if ($server['tls_settings']) {
                         $tlsSettings = $server['tls_settings'];
+                        if (isset($tlsSettings['allowInsecure']) && !empty($tlsSettings['allowInsecure']))
+                            $array['skip-cert-verify'] = ($tlsSettings['allowInsecure'] ? true : false);
                         if (isset($tlsSettings['server_name']) && !empty($tlsSettings['server_name']))
                             $array['servername'] = $tlsSettings['server_name'];
                     }
                     break;
-                case 2:
-                    if (!isset($server['network_settings'])) break;
-                    $networkSettings = $server['network_settings'];
-                    if (isset($networkSettings['reality-opts'])){
-                        $realitySettings = $networkSettings['reality-opts'];
-                        $array['reality-opts'] = [];
-                        $array['reality-opts']['public-key'] = $realitySettings['public-key'];
-                        $array['reality-opts']['short-id'] = $realitySettings['short-id'];
-                    }
+                case 2:  //开启reality
+                    $array['tls'] = true;
+                    $tls_settings = $server['tls_settings'];
+                    if (!empty($tls_settings['allowInsecure'])) $array['skip-cert-verify'] = (bool)$tls_settings['allowInsecure'];
+
+                    if(($tls_settings['public_key'] ?? null)
+                    && ($tls_settings['short_id'] ?? null)
+                    && ($tls_settings['server_name'] ?? null)){
+                        $array['servername'] = $tls_settings['server_name'];
+                        $array['reality-opts'] = [
+                            'public-key' => $tls_settings['public_key'],
+                            'short-id' => $tls_settings['short_id']
+                        ];
+                        $fingerprints = ['chrome', 'firefox', 'safari', 'ios', 'edge', 'qq']; //随机客户端指纹
+                        $array['client-fingerprint'] = $fingerprints[rand(0,count($fingerprints) - 1)];
+                    };
                     break;
-            }
-
-        }
-
-        if ($server['network'] === 'tcp') {
-            $tcpSettings = $server['networkSettings'];
-            if (isset($tcpSettings['header']['type']) && $tcpSettings['header']['type'] == 'http') {
-                $array['network'] = $tcpSettings['header']['type'];
-                if (isset($tcpSettings['header']['request']['headers']['Host'])){
-                    $array['http-opts']['headers']['Host'] = $tcpSettings['header']['request']['headers']['Host'];
-                }
-                if (isset($tcpSettings['header']['request']['path'][0])){
-                    $paths = $tcpSettings['header']['request']['path'];
-                    $array['http-opts']['path'] = $paths[array_rand($paths)];
-                };
             }
         }
 
@@ -241,7 +241,9 @@ class Stash
             if ($server['network_settings']) {
                 $grpcSettings = $server['network_settings'];
                 $array['grpc-opts'] = [];
-                if (isset($grpcSettings['serviceName'])) $array['grpc-opts']['grpc-service-name'] = $grpcSettings['serviceName'];
+                if (isset($grpcSettings['serviceName'])) {
+                    $array['grpc-opts']['grpc-service-name'] = $grpcSettings['serviceName'];
+                };
             }
         }
 
