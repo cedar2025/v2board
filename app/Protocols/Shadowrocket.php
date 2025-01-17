@@ -150,8 +150,8 @@ class Shadowrocket
                     $config['tls'] = 1;
                     if ($server['tls_settings']) {
                         $tlsSettings = $server['tls_settings'];
-                        if (isset($tlsSettings['allowInsecure']) && !empty($tlsSettings['allowInsecure']))
-                            $config['allowInsecure'] = (int)$tlsSettings['allowInsecure'];
+                        if (isset($tlsSettings['allow_insecure']) && !empty($tlsSettings['allow_insecure']))
+                            $config['allowInsecure'] = (int)$tlsSettings['allow_insecure'];
                         if (isset($tlsSettings['server_name']) && !empty($tlsSettings['server_name']))
                             $config['peer'] = $tlsSettings['server_name'];
                     }

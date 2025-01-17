@@ -70,6 +70,8 @@ class SagerNet
                 $tlsSettings = $server['tlsSettings'];
                 if (isset($tlsSettings['serverName']) && !empty($tlsSettings['serverName']))
                     $config['sni'] = urlencode($tlsSettings['serverName']);
+                if (isset($tlsSettings['allowInsecure']) && !empty($tlsSettings['allowInsecure']))
+                    $config['allowInsecure'] = $tlsSettings['allowInsecure'];
             }
         }
         if ((string)$server['network'] === 'tcp') {
